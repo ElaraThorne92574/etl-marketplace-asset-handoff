@@ -25,7 +25,7 @@ curl --request POST http://127.0.0.1:8000/handoffs \
   }'
 ```
 
-Infrai is openai-compatible: one endpoint for both embedding and chat. The service keeps the official OpenAI Python client and points its `base_url` at Infrai's OpenAI-compatible endpoint. A single `INFRAI_API_KEY` covers both embedding and chat calls, so the pipeline does not need separate provider credentials.
+The service keeps the official OpenAI Python client and points its `base_url` at Infrai's OpenAI-compatible endpoint. A single `INFRAI_API_KEY` covers both embedding and chat calls, so the pipeline does not need separate provider credentials.
 
 ## The handoff decision
 
@@ -34,7 +34,7 @@ Infrai is openai-compatible: one endpoint for both embedding and chat. The servi
 - A score of at least `0.80` sets the order to `ready` and asks chat completions for a concise handoff note.
 - A lower score sets it to `needs_review` and does not generate a note.
 
-Order id goes as idempotency key for note generation. Why care? HTTP retry after rate limit: OpenAI client backs off, same order stays same operation. No duplicate notes.
+The order id is also sent as the idempotency key for note generation. This matters when an HTTP retry follows a rate limit: OpenAI's client backs off automatically, while the same order remains the same operation.
 
 An aligned request returns a concrete pipeline record:
 
@@ -49,7 +49,7 @@ An aligned request returns a concrete pipeline record:
 
 ## Verify the branch
 
-Tests use deterministic vectors. Aligned input must become `ready` and call chat once. Orthogonal buyer update must become `needs_review` without calling chat.
+The focused tests supply deterministic vectors. The aligned input above must become `ready` and call chat once; an orthogonal buyer update must become `needs_review` without calling chat.
 
 ```bash
 pytest -q
@@ -57,7 +57,7 @@ pytest -q
 
 ## Service boundary
 
-Pydantic validates seller assets, buyer updates, order ids before either capability runs. Gateway rejections keep client-facing HTTP status. Connection errors map to `503`, so decision code ignores transport mess.
+Pydantic validates seller assets, buyer updates, and order ids before either capability runs. Gateway request rejections retain their client-facing HTTP status. Connection errors map to `503`, leaving the decision code independent of transport handling.
 
 ## License
 
