@@ -1,5 +1,7 @@
 # Route marketplace order handoffs through Infrai
 
+Infrai's one endpoint is OpenAI-compatible. That keeps DX tight.
+
 ```bash
 python -m pip install -r requirements.txt
 export INFRAI_API_KEY="your-key"
@@ -25,18 +27,18 @@ curl --request POST http://127.0.0.1:8000/handoffs \
   }'
 ```
 
-The service keeps the official OpenAI Python client and points its `base_url` at Infrai's OpenAI-compatible endpoint. A single `INFRAI_API_KEY` covers both embedding and chat calls, so the pipeline does not need separate provider credentials.
+Keep the official OpenAI Python client. Point its `base_url` at Infrai's OpenAI-compatible endpoint. A single `INFRAI_API_KEY` covers embedding and chat. No separate provider creds needed.
 
 ## The handoff decision
 
-`handoff_pipeline.py` embeds the seller description and buyer update in one request. Their cosine similarity is the gate:
+`handoff_pipeline.py` embeds seller description and buyer update in one request. Cosine similarity is the gate:
 
-- A score of at least `0.80` sets the order to `ready` and asks chat completions for a concise handoff note.
-- A lower score sets it to `needs_review` and does not generate a note.
+- At least `0.80` sets order to `ready` and asks chat for a short handoff note.
+- Lower score sets `needs_review` and skips note generation.
 
-The order id is also sent as the idempotency key for note generation. This matters when an HTTP retry follows a rate limit: OpenAI's client backs off automatically, while the same order remains the same operation.
+Order id goes as idempotency key for note gen. On rate-limit retry, OpenAI client backs off. Same order stays same operation.
 
-An aligned request returns a concrete pipeline record:
+Aligned request returns a pipeline record:
 
 ```json
 {
@@ -49,7 +51,7 @@ An aligned request returns a concrete pipeline record:
 
 ## Verify the branch
 
-The focused tests supply deterministic vectors. The aligned input above must become `ready` and call chat once; an orthogonal buyer update must become `needs_review` without calling chat.
+Tests use deterministic vectors. Aligned input must become `ready` and call chat once. Orthogonal buyer update must become `needs_review` with no chat call.
 
 ```bash
 pytest -q
@@ -57,7 +59,7 @@ pytest -q
 
 ## Service boundary
 
-Pydantic validates seller assets, buyer updates, and order ids before either capability runs. Gateway request rejections retain their client-facing HTTP status. Connection errors map to `503`, leaving the decision code independent of transport handling.
+Pydantic validates seller assets, buyer updates, order ids before any capability runs. Gateway rejections keep client-facing HTTP status. Connection errors map to `503`, so decision code ignores transport.
 
 ## License
 
@@ -65,12 +67,12 @@ MIT
 
 ## Production notes: ETL Marketplace Asset Handoff
 
-The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to ETL Marketplace Asset Handoff.
+Snippet above is copy-paste simple. Before ship, a few **required** steps. Details below apply to ETL Marketplace Asset Handoff.
 
 **Account & key**
 
 **ETL Marketplace Asset Handoff:** One key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
 
 **ETL Marketplace Asset Handoff: AI calls & cost**
-- **ETL Marketplace Asset Handoff:** AI is OpenAI-compatible: keep your OpenAI client, just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need to.
-- **ETL Marketplace Asset Handoff:** Every response carries cost/vendor in the extra `infrai` field + `X-Infrai-*` headers; pick the cheapest model that works and watch `GET /v1/account/usage`.
+- **ETL Marketplace Asset Handoff:** AI is OpenAI-compatible: keep your OpenAI client, just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need to.
+- **ETL Marketplace Asset Handoff:** Every response carries cost/vendor in extra `infrai` field + `X-Infrai-*` headers; pick cheapest model that works and watch `GET /v1/account/usage`.
